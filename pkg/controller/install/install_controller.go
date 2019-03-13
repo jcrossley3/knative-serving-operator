@@ -8,7 +8,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -29,7 +28,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileInstall{client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	return &ReconcileInstall{client: mgr.GetClient(), scheme: mgr.GetScheme(), config: mgr.GetConfig()}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -54,9 +53,9 @@ var _ reconcile.Reconciler = &ReconcileInstall{}
 type ReconcileInstall struct {
 	// This client, initialized using mgr.Client() above, is a split client
 	// that reads objects from the cache and writes to the apiserver
-	client        client.Client
-	scheme        *runtime.Scheme
-	dynamicClient dynamic.Interface
+	client client.Client
+	scheme *runtime.Scheme
+	config *rest.Config
 }
 
 // Reconcile reads that state of the cluster for a Install object and makes changes based on the state read
@@ -81,12 +80,11 @@ func (r *ReconcileInstall) Reconcile(request reconcile.Request) (reconcile.Resul
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	}
-	manifests.Create(manifests.Parse("/tmp/knative-serving.yaml"), r.dynamicClient)
+	// Apply the resources in the YAML file
+	yaml := manifests.NewYamlFile("/tmp/knative-serving.yaml", r.config)
+	err = yaml.Apply()
+	if err != nil {
+		reqLogger.Error(err, "TODO: probably more than this")
+	}
 	return reconcile.Result{}, nil
-}
-
-func (r *ReconcileInstall) InjectConfig(c *rest.Config) error {
-	var err error
-	r.dynamicClient, err = dynamic.NewForConfig(c)
-	return err
 }

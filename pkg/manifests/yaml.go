@@ -12,10 +12,28 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/rest"
 )
 
-// Parse a yaml file into a slice of Unstructured resources
-func Parse(filename string) []unstructured.Unstructured {
+func NewYamlFile(path string, config *rest.Config) *YamlFile {
+	client, _ := dynamic.NewForConfig(config)
+	return &YamlFile{Name: path, dynamicClient: client}
+}
+
+func (f *YamlFile) Apply() error {
+	if f.Resources == nil {
+		f.Resources = parse(f.Name)
+	}
+	return create(f.Resources, f.dynamicClient)
+}
+
+type YamlFile struct {
+	Name          string
+	dynamicClient dynamic.Interface
+	Resources     []unstructured.Unstructured
+}
+
+func parse(filename string) []unstructured.Unstructured {
 	in, out := make(chan []byte, 10), make(chan unstructured.Unstructured, 10)
 	go read(filename, in)
 	go decode(in, out)
@@ -24,21 +42,6 @@ func Parse(filename string) []unstructured.Unstructured {
 		result = append(result, spec)
 	}
 	return result
-}
-
-// Apply a slice of Unstructured resources
-func Create(resources []unstructured.Unstructured, dc dynamic.Interface) error {
-	for _, spec := range resources {
-		c, err := client(spec, dc)
-		if err != nil {
-			return err
-		}
-		_, err = c.Create(&spec, v1.CreateOptions{})
-		if err != nil {
-			fmt.Println("ERROR", spec.GetName(), err)
-		}
-	}
-	return nil
 }
 
 func buffer(file *os.File) []byte {
@@ -94,6 +97,20 @@ func pluralize(kind string) string {
 	default:
 		return fmt.Sprintf("%ss", ret)
 	}
+}
+
+func create(resources []unstructured.Unstructured, dc dynamic.Interface) error {
+	for _, spec := range resources {
+		c, err := client(spec, dc)
+		if err != nil {
+			return err
+		}
+		_, err = c.Create(&spec, v1.CreateOptions{})
+		if err != nil {
+			fmt.Println("ERROR", spec.GetName(), err)
+		}
+	}
+	return nil
 }
 
 func client(spec unstructured.Unstructured, dc dynamic.Interface) (dynamic.ResourceInterface, error) {
