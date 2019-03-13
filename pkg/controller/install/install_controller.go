@@ -8,7 +8,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -28,7 +27,10 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileInstall{client: mgr.GetClient(), scheme: mgr.GetScheme(), config: mgr.GetConfig()}
+	return &ReconcileInstall{
+		client: mgr.GetClient(),
+		scheme: mgr.GetScheme(),
+		config: manifests.NewYamlFile("/tmp/knative-serving.yaml", mgr.GetConfig())}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -55,7 +57,7 @@ type ReconcileInstall struct {
 	// that reads objects from the cache and writes to the apiserver
 	client client.Client
 	scheme *runtime.Scheme
-	config *rest.Config
+	config *manifests.YamlFile
 }
 
 // Reconcile reads that state of the cluster for a Install object and makes changes based on the state read
@@ -81,10 +83,8 @@ func (r *ReconcileInstall) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, err
 	}
 	// Apply the resources in the YAML file
-	yaml := manifests.NewYamlFile("/tmp/knative-serving.yaml", r.config)
-	err = yaml.Apply()
+	err = r.config.Apply()
 	if err != nil {
-		reqLogger.Error(err, "TODO: maybe not this?")
 		return reconcile.Result{}, err
 	}
 	return reconcile.Result{}, nil

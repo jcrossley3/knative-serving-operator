@@ -14,7 +14,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
+	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
+
+var log = logf.Log.WithName("manifest_yaml")
 
 func NewYamlFile(path string, config *rest.Config) *YamlFile {
 	client, _ := dynamic.NewForConfig(config)
@@ -44,6 +47,7 @@ func (f *YamlFile) Apply() error {
 			}
 			return err
 		}
+		log.Info("Created resource", "kind", spec.GetKind(), "name", spec.GetName())
 	}
 	return nil
 }
