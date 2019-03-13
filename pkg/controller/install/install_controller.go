@@ -83,7 +83,7 @@ func (r *ReconcileInstall) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, err
 	}
 	// Apply the resources in the YAML file
-	err = r.config.Apply()
+	err = r.config.Apply(instance)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
