@@ -2,6 +2,7 @@ package install
 
 import (
 	"context"
+	"flag"
 
 	servingv1alpha1 "github.com/jcrossley3/knative-serving-operator/pkg/apis/serving/v1alpha1"
 	"github.com/jcrossley3/knative-serving-operator/pkg/manifests"
@@ -18,7 +19,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-var log = logf.Log.WithName("controller_install")
+var (
+	filename = flag.String("filename", "/tmp/knative-serving.yaml",
+		"The filename containing the YAML resources to apply")
+	log = logf.Log.WithName("controller_install")
+)
 
 // Add creates a new Install Controller and adds it to the Manager. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -31,7 +36,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileInstall{
 		client: mgr.GetClient(),
 		scheme: mgr.GetScheme(),
-		config: manifests.NewYamlFile("/tmp/knative-serving.yaml", mgr.GetConfig())}
+		config: manifests.NewYamlFile(*filename, mgr.GetConfig())}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler

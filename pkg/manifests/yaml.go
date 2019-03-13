@@ -26,6 +26,7 @@ func NewYamlFile(path string, config *rest.Config) *YamlFile {
 
 func (f *YamlFile) Apply(owner *v1.OwnerReference) error {
 	if f.Resources == nil {
+		log.Info("Reading YAML file", "name", f.Name)
 		f.Resources = parse(f.Name)
 	}
 	for _, spec := range f.Resources {
@@ -104,7 +105,7 @@ func decode(in chan []byte, out chan unstructured.Unstructured) {
 		err := yaml.NewYAMLToJSONDecoder(bytes.NewReader(buf)).Decode(&spec)
 		if err != nil {
 			if err != io.EOF {
-				fmt.Println("ERROR", spec.GetName(), err)
+				log.Error(err, "Unable to decode YAML; ignoring")
 			}
 			continue
 		}
