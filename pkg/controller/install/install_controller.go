@@ -84,7 +84,8 @@ func (r *ReconcileInstall) Reconcile(request reconcile.Request) (reconcile.Resul
 	yaml := manifests.NewYamlFile("/tmp/knative-serving.yaml", r.config)
 	err = yaml.Apply()
 	if err != nil {
-		reqLogger.Error(err, "TODO: probably more than this")
+		reqLogger.Error(err, "TODO: maybe not this?")
+		return reconcile.Result{}, err
 	}
 	return reconcile.Result{}, nil
 }

@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -24,7 +25,27 @@ func (f *YamlFile) Apply() error {
 	if f.Resources == nil {
 		f.Resources = parse(f.Name)
 	}
-	return create(f.Resources, f.dynamicClient)
+	for _, spec := range f.Resources {
+		c, err := client(spec, f.dynamicClient)
+		if err != nil {
+			return err
+		}
+		_, err = c.Get(spec.GetName(), v1.GetOptions{})
+		if err == nil {
+			continue
+		}
+		if !errors.IsNotFound(err) {
+			return err
+		}
+		_, err = c.Create(&spec, v1.CreateOptions{})
+		if err != nil {
+			if errors.IsAlreadyExists(err) {
+				continue
+			}
+			return err
+		}
+	}
+	return nil
 }
 
 type YamlFile struct {
@@ -99,27 +120,12 @@ func pluralize(kind string) string {
 	}
 }
 
-func create(resources []unstructured.Unstructured, dc dynamic.Interface) error {
-	for _, spec := range resources {
-		c, err := client(spec, dc)
-		if err != nil {
-			return err
-		}
-		_, err = c.Create(&spec, v1.CreateOptions{})
-		if err != nil {
-			fmt.Println("ERROR", spec.GetName(), err)
-		}
-	}
-	return nil
-}
-
 func client(spec unstructured.Unstructured, dc dynamic.Interface) (dynamic.ResourceInterface, error) {
 	groupVersion, err := schema.ParseGroupVersion(spec.GetAPIVersion())
 	if err != nil {
 		return nil, err
 	}
 	groupVersionResource := groupVersion.WithResource(pluralize(spec.GetKind()))
-	fmt.Println(groupVersionResource)
 	if ns := spec.GetNamespace(); ns == "" {
 		return dc.Resource(groupVersionResource), nil
 	} else {
