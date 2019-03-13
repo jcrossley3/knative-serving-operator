@@ -7,6 +7,7 @@ import (
 	"github.com/jcrossley3/knative-serving-operator/pkg/manifests"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -83,7 +84,7 @@ func (r *ReconcileInstall) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, err
 	}
 	// Apply the resources in the YAML file
-	err = r.config.Apply(instance)
+	err = r.config.Apply(v1.NewControllerRef(instance, instance.GroupVersionKind()))
 	if err != nil {
 		return reconcile.Result{}, err
 	}
