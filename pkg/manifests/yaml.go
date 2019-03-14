@@ -17,7 +17,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
 
-var log = logf.Log.WithName("manifest_yaml")
+var log = logf.Log.WithName("manifests")
 
 func NewYamlFile(path string, config *rest.Config) *YamlFile {
 	client, _ := dynamic.NewForConfig(config)
@@ -38,7 +38,12 @@ func (f *YamlFile) Apply(owner *v1.OwnerReference) error {
 		if !errors.IsNotFound(err) {
 			return err
 		}
-		spec.SetOwnerReferences([]v1.OwnerReference{*owner})
+		if !isClusterScoped(spec) {
+			// apparently reference counting for cluster-scoped
+			// resources is broken, so trust the GC only for ns-scoped
+			// dependents
+			spec.SetOwnerReferences([]v1.OwnerReference{*owner})
+		}
 		_, err = c.Create(&spec, v1.CreateOptions{})
 		if err != nil {
 			if errors.IsAlreadyExists(err) {
@@ -46,7 +51,26 @@ func (f *YamlFile) Apply(owner *v1.OwnerReference) error {
 			}
 			return err
 		}
-		log.Info("Created resource", "kind", spec.GetKind(), "name", spec.GetName())
+		log.Info("Created resource", "type", spec.GroupVersionKind(), "name", spec.GetName())
+	}
+	return nil
+}
+
+func (f *YamlFile) Delete() error {
+	a := make([]unstructured.Unstructured, len(f.resources))
+	copy(a, f.resources)
+	// we want to delete in reverse order
+	for left, right := 0, len(a)-1; left < right; left, right = left+1, right-1 {
+		a[left], a[right] = a[right], a[left]
+	}
+	for _, spec := range a {
+		c, err := client(spec, f.dynamicClient)
+		if err != nil {
+			return err
+		}
+		log.Info("Deleting resource", "type", spec.GroupVersionKind(), "name", spec.GetName())
+		c.Delete(spec.GetName(), &v1.DeleteOptions{})
+		// ignore GC race conditions triggered by owner references
 	}
 	return nil
 }
@@ -134,4 +158,12 @@ func client(spec unstructured.Unstructured, dc dynamic.Interface) (dynamic.Resou
 	} else {
 		return dc.Resource(groupVersionResource).Namespace(ns), nil
 	}
+}
+
+func isClusterScoped(spec unstructured.Unstructured) bool {
+	switch spec.GetKind() {
+	case "Namespace", "ClusterRole", "ClusterRoleBinding", "CustomResourceDefinition":
+		return true
+	}
+	return false
 }
