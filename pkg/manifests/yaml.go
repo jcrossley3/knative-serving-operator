@@ -38,7 +38,7 @@ func (f *YamlFile) Apply(owner *v1.OwnerReference) error {
 		if !errors.IsNotFound(err) {
 			return err
 		}
-		if !isClusterScoped(spec) {
+		if !isClusterScoped(spec.GetKind()) {
 			// apparently reference counting for cluster-scoped
 			// resources is broken, so trust the GC only for ns-scoped
 			// dependents
@@ -73,6 +73,14 @@ func (f *YamlFile) Delete() error {
 		// ignore GC race conditions triggered by owner references
 	}
 	return nil
+}
+
+func (f *YamlFile) ResourceNames() []string {
+	var names []string
+	for _, spec := range f.resources {
+		names = append(names, fmt.Sprintf("%s (%s)", spec.GetName(), spec.GroupVersionKind()))
+	}
+	return names
 }
 
 type YamlFile struct {
@@ -160,9 +168,9 @@ func client(spec unstructured.Unstructured, dc dynamic.Interface) (dynamic.Resou
 	}
 }
 
-func isClusterScoped(spec unstructured.Unstructured) bool {
-	switch spec.GetKind() {
-	case "Namespace", "ClusterRole", "ClusterRoleBinding", "CustomResourceDefinition":
+func isClusterScoped(kind string) bool {
+	switch strings.ToLower(kind) {
+	case "namespace", "clusterrole", "clusterrolebinding", "customresourcedefinition":
 		return true
 	}
 	return false

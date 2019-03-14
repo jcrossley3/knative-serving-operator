@@ -94,5 +94,12 @@ func (r *ReconcileInstall) Reconcile(request reconcile.Request) (reconcile.Resul
 	if err != nil {
 		return reconcile.Result{}, err
 	}
+	// Update status.Resources
+	instance.Status.Resources = r.config.ResourceNames()
+	err = r.client.Status().Update(context.TODO(), instance)
+	if err != nil {
+		reqLogger.Error(err, "Failed to update status")
+		return reconcile.Result{}, err
+	}
 	return reconcile.Result{}, nil
 }
