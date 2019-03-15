@@ -30,8 +30,15 @@ func NewYamlFile(path string, config *rest.Config) *YamlFile {
 	return &YamlFile{name: path, resources: parse(path), dynamicClient: client}
 }
 
-func (f *YamlFile) Apply(owner *v1.OwnerReference) error {
+func (f *YamlFile) Apply(owner *v1.OwnerReference, namespace string) error {
 	for _, spec := range f.resources {
+		if !isClusterScoped(spec.GetKind()) {
+			spec.SetNamespace(namespace)
+			// apparently reference counting for cluster-scoped
+			// resources is broken, so trust the GC only for ns-scoped
+			// dependents
+			spec.SetOwnerReferences([]v1.OwnerReference{*owner})
+		}
 		c, err := client(spec, f.dynamicClient)
 		if err != nil {
 			return err
@@ -42,12 +49,6 @@ func (f *YamlFile) Apply(owner *v1.OwnerReference) error {
 		}
 		if !errors.IsNotFound(err) {
 			return err
-		}
-		if !isClusterScoped(spec.GetKind()) {
-			// apparently reference counting for cluster-scoped
-			// resources is broken, so trust the GC only for ns-scoped
-			// dependents
-			spec.SetOwnerReferences([]v1.OwnerReference{*owner})
 		}
 		log.Info("Creating", "type", spec.GroupVersionKind(), "name", spec.GetName())
 		if _, err = c.Create(&spec, v1.CreateOptions{}); err != nil {
@@ -104,6 +105,9 @@ func parse(filename string) []unstructured.Unstructured {
 	result := []unstructured.Unstructured{}
 	for spec := range out {
 		if *olm && isManagedByOLM(spec.GetKind()) {
+			continue
+		}
+		if strings.ToLower(spec.GetKind()) == "namespace" {
 			continue
 		}
 		result = append(result, spec)
@@ -180,8 +184,28 @@ func client(spec unstructured.Unstructured, dc dynamic.Interface) (dynamic.Resou
 }
 
 func isClusterScoped(kind string) bool {
+	// TODO: something more clever using !APIResource.Namespaced maybe?
 	switch strings.ToLower(kind) {
-	case "namespace", "clusterrole", "clusterrolebinding", "customresourcedefinition":
+	case "componentstatus",
+		"namespace",
+		"node",
+		"persistentvolume",
+		"mutatingwebhookconfiguration",
+		"validatingwebhookconfiguration",
+		"customresourcedefinition",
+		"apiservice",
+		"meshpolicy",
+		"tokenreview",
+		"selfsubjectaccessreview",
+		"selfsubjectrulesreview",
+		"subjectaccessreview",
+		"certificatesigningrequest",
+		"podsecuritypolicy",
+		"clusterrolebinding",
+		"clusterrole",
+		"priorityclass",
+		"storageclass",
+		"volumeattachment":
 		return true
 	}
 	return false

@@ -95,7 +95,7 @@ func (r *ReconcileInstall) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, nil
 	}
 	// Apply the resources in the YAML file
-	err = r.config.Apply(v1.NewControllerRef(instance, instance.GroupVersionKind()))
+	err = r.config.Apply(v1.NewControllerRef(instance, instance.GroupVersionKind()), request.Namespace)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
