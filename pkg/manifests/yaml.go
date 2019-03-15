@@ -69,8 +69,12 @@ func (f *YamlFile) Delete() error {
 			return err
 		}
 		log.Info("Deleting resource", "type", spec.GroupVersionKind(), "name", spec.GetName())
-		c.Delete(spec.GetName(), &v1.DeleteOptions{})
-		// ignore GC race conditions triggered by owner references
+		if err = c.Delete(spec.GetName(), &v1.DeleteOptions{}); err != nil {
+			// ignore GC race conditions triggered by owner references
+			if !errors.IsNotFound(err) {
+				log.Error(err, "Unable to delete resource")
+			}
+		}
 	}
 	return nil
 }
