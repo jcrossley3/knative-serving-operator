@@ -3,6 +3,7 @@ package install
 import (
 	"context"
 	"flag"
+	"os"
 
 	servingv1alpha1 "github.com/jcrossley3/knative-serving-operator/pkg/apis/serving/v1alpha1"
 	"github.com/jcrossley3/knative-serving-operator/pkg/manifests"
@@ -98,12 +99,21 @@ func (r *ReconcileInstall) Reconcile(request reconcile.Request) (reconcile.Resul
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-	// Update status.Resources
+	// Update status
 	instance.Status.Resources = r.config.ResourceNames()
+	instance.Status.Version = getKnativeServingVersion()
 	err = r.client.Status().Update(context.TODO(), instance)
 	if err != nil {
 		reqLogger.Error(err, "Failed to update status")
 		return reconcile.Result{}, err
 	}
 	return reconcile.Result{}, nil
+}
+
+func getKnativeServingVersion() string {
+	v, found := os.LookupEnv("KNATIVE_SERVING_VERSION")
+	if !found {
+		return "UNKNOWN"
+	}
+	return v
 }
