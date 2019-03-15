@@ -2,6 +2,7 @@ package manifests
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -17,7 +18,11 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
 
-var log = logf.Log.WithName("manifests")
+var (
+	olm = flag.Bool("olm", false,
+		"Ignores resources managed by the Operator Lifecycle Manager")
+	log = logf.Log.WithName("manifests")
+)
 
 func NewYamlFile(path string, config *rest.Config) *YamlFile {
 	client, _ := dynamic.NewForConfig(config)
@@ -44,14 +49,13 @@ func (f *YamlFile) Apply(owner *v1.OwnerReference) error {
 			// dependents
 			spec.SetOwnerReferences([]v1.OwnerReference{*owner})
 		}
-		_, err = c.Create(&spec, v1.CreateOptions{})
-		if err != nil {
+		log.Info("Creating", "type", spec.GroupVersionKind(), "name", spec.GetName())
+		if _, err = c.Create(&spec, v1.CreateOptions{}); err != nil {
 			if errors.IsAlreadyExists(err) {
 				continue
 			}
 			return err
 		}
-		log.Info("Created resource", "type", spec.GroupVersionKind(), "name", spec.GetName())
 	}
 	return nil
 }
@@ -68,7 +72,7 @@ func (f *YamlFile) Delete() error {
 		if err != nil {
 			return err
 		}
-		log.Info("Deleting resource", "type", spec.GroupVersionKind(), "name", spec.GetName())
+		log.Info("Deleting", "type", spec.GroupVersionKind(), "name", spec.GetName())
 		if err = c.Delete(spec.GetName(), &v1.DeleteOptions{}); err != nil {
 			// ignore GC race conditions triggered by owner references
 			if !errors.IsNotFound(err) {
@@ -99,6 +103,9 @@ func parse(filename string) []unstructured.Unstructured {
 	go decode(in, out)
 	result := []unstructured.Unstructured{}
 	for spec := range out {
+		if *olm && isManagedByOLM(spec.GetKind()) {
+			continue
+		}
 		result = append(result, spec)
 	}
 	return result
@@ -175,6 +182,16 @@ func client(spec unstructured.Unstructured, dc dynamic.Interface) (dynamic.Resou
 func isClusterScoped(kind string) bool {
 	switch strings.ToLower(kind) {
 	case "namespace", "clusterrole", "clusterrolebinding", "customresourcedefinition":
+		return true
+	}
+	return false
+}
+
+func isManagedByOLM(kind string) bool {
+	switch strings.ToLower(kind) {
+	case "namespace", "role", "rolebinding",
+		"clusterrole", "clusterrolebinding",
+		"customresourcedefinition":
 		return true
 	}
 	return false
