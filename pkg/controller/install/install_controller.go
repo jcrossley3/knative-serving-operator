@@ -89,6 +89,10 @@ func (r *ReconcileInstall) Reconcile(request reconcile.Request) (reconcile.Resul
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	}
+	if instance.Status.Resources != nil {
+		// we've already successfully applied our YAML
+		return reconcile.Result{}, nil
+	}
 	// Apply the resources in the YAML file
 	err = r.config.Apply(v1.NewControllerRef(instance, instance.GroupVersionKind()))
 	if err != nil {
