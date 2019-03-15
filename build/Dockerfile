@@ -14,7 +14,7 @@ COPY build/bin /usr/local/bin
 RUN  /usr/local/bin/user_setup
 
 # install knative-serving manifest
-COPY deploy/knative-serving-$version.yaml /tmp/knative-serving.yaml
+COPY deploy/resources/knative-serving-$version.yaml /tmp/knative-serving.yaml
 
 ENTRYPOINT ["/usr/local/bin/entrypoint"]
 
