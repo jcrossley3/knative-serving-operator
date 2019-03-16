@@ -21,6 +21,8 @@ import (
 var (
 	olm = flag.Bool("olm", false,
 		"Ignores resources managed by the Operator Lifecycle Manager")
+	denamespace = flag.Bool("override-namespace", false,
+		"Ignores Namespace resources and creates all others in watched namespace")
 	log = logf.Log.WithName("manifests")
 )
 
@@ -33,22 +35,26 @@ func NewYamlFile(path string, config *rest.Config) *YamlFile {
 func (f *YamlFile) Apply(owner *v1.OwnerReference, namespace string) error {
 	for _, spec := range f.resources {
 		if !isClusterScoped(spec.GetKind()) {
-			spec.SetNamespace(namespace)
 			// apparently reference counting for cluster-scoped
 			// resources is broken, so trust the GC only for ns-scoped
 			// dependents
 			spec.SetOwnerReferences([]v1.OwnerReference{*owner})
+			// overwrite YAML resource to match target
+			if *denamespace {
+				spec.SetNamespace(namespace)
+			}
+
 		}
 		c, err := client(spec, f.dynamicClient)
 		if err != nil {
 			return err
 		}
-		_, err = c.Get(spec.GetName(), v1.GetOptions{})
-		if err == nil {
+		if _, err = c.Get(spec.GetName(), v1.GetOptions{}); err != nil {
+			if !errors.IsNotFound(err) {
+				return err
+			}
+		} else {
 			continue
-		}
-		if !errors.IsNotFound(err) {
-			return err
 		}
 		log.Info("Creating", "type", spec.GroupVersionKind(), "name", spec.GetName())
 		if _, err = c.Create(&spec, v1.CreateOptions{}); err != nil {
@@ -73,11 +79,16 @@ func (f *YamlFile) Delete() error {
 		if err != nil {
 			return err
 		}
+		if _, err = c.Get(spec.GetName(), v1.GetOptions{}); err != nil {
+			if errors.IsNotFound(err) {
+				continue
+			}
+		}
 		log.Info("Deleting", "type", spec.GroupVersionKind(), "name", spec.GetName())
 		if err = c.Delete(spec.GetName(), &v1.DeleteOptions{}); err != nil {
 			// ignore GC race conditions triggered by owner references
 			if !errors.IsNotFound(err) {
-				log.Error(err, "Unable to delete resource")
+				return err
 			}
 		}
 	}
@@ -107,7 +118,7 @@ func parse(filename string) []unstructured.Unstructured {
 		if *olm && isManagedByOLM(spec.GetKind()) {
 			continue
 		}
-		if strings.ToLower(spec.GetKind()) == "namespace" {
+		if *denamespace && strings.ToLower(spec.GetKind()) == "namespace" {
 			continue
 		}
 		result = append(result, spec)
