@@ -32,16 +32,16 @@ func NewYamlFile(path string, config *rest.Config) *YamlFile {
 	return &YamlFile{name: path, resources: parse(path), dynamicClient: client}
 }
 
-func (f *YamlFile) Apply(owner *v1.OwnerReference, namespace string) error {
+func (f *YamlFile) Apply(owner OperandOwner) error {
 	for _, spec := range f.resources {
 		if !isClusterScoped(spec.GetKind()) {
 			// apparently reference counting for cluster-scoped
 			// resources is broken, so trust the GC only for ns-scoped
 			// dependents
-			spec.SetOwnerReferences([]v1.OwnerReference{*owner})
+			spec.SetOwnerReferences([]v1.OwnerReference{*v1.NewControllerRef(owner, owner.GroupVersionKind())})
 			// overwrite YAML resource to match target
 			if *denamespace {
-				spec.SetNamespace(namespace)
+				spec.SetNamespace(owner.GetNamespace())
 			}
 
 		}
@@ -107,6 +107,11 @@ type YamlFile struct {
 	name          string
 	dynamicClient dynamic.Interface
 	resources     []unstructured.Unstructured
+}
+
+type OperandOwner interface {
+	v1.Object
+	GroupVersionKind() schema.GroupVersionKind
 }
 
 func parse(filename string) []unstructured.Unstructured {
