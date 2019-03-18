@@ -231,7 +231,7 @@ func isManagedByOLM(kind string) bool {
 	switch strings.ToLower(kind) {
 	case "namespace", "role", "rolebinding",
 		"clusterrole", "clusterrolebinding",
-		"customresourcedefinition":
+		"customresourcedefinition", "serviceaccount":
 		return true
 	}
 	return false
