@@ -7,8 +7,10 @@ import (
 
 	servingv1alpha1 "github.com/jcrossley3/knative-serving-operator/pkg/apis/serving/v1alpha1"
 	"github.com/jcrossley3/knative-serving-operator/pkg/manifests"
+	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -22,6 +24,8 @@ import (
 var (
 	filename = flag.String("filename", "/tmp/knative-serving.yaml",
 		"The filename containing the YAML resources to apply")
+	autoinstall = flag.Bool("install", false,
+		"Automatically creates an Install resource if none exist")
 	log = logf.Log.WithName("controller_install")
 )
 
@@ -51,6 +55,12 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(&source.Kind{Type: &servingv1alpha1.Install{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
+	}
+
+	// Auto-create Install
+	if *autoinstall {
+		ns, _ := k8sutil.GetWatchNamespace()
+		go autoInstall(mgr.GetClient(), ns)
 	}
 	return nil
 }
@@ -115,4 +125,26 @@ func getKnativeServingVersion() string {
 		return "UNKNOWN"
 	}
 	return v
+}
+
+func autoInstall(c client.Client, ns string) error {
+	installList := &servingv1alpha1.InstallList{}
+	err := c.List(context.TODO(), &client.ListOptions{Namespace: ns}, installList)
+	if err != nil {
+		log.Error(err, "Unable to list Installs")
+		return err
+	}
+	if len(installList.Items) == 0 {
+		install := &servingv1alpha1.Install{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "auto-install",
+				Namespace: ns,
+			},
+		}
+		err = c.Create(context.TODO(), install)
+		if err != nil {
+			log.Error(err, "Unable to create Install")
+		}
+	}
+	return nil
 }
