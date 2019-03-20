@@ -1,4 +1,4 @@
-package manifests
+package yaml
 
 import (
 	"bytes"

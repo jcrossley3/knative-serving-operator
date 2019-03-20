@@ -6,7 +6,7 @@ import (
 	"os"
 
 	servingv1alpha1 "github.com/jcrossley3/knative-serving-operator/pkg/apis/serving/v1alpha1"
-	"github.com/jcrossley3/knative-serving-operator/pkg/manifests"
+	"github.com/jcrossley3/manifestival/yaml"
 	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -40,7 +40,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileInstall{
 		client: mgr.GetClient(),
 		scheme: mgr.GetScheme(),
-		config: manifests.NewYamlFile(*filename, mgr.GetConfig())}
+		config: yaml.NewYamlFile(*filename, mgr.GetConfig())}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -73,7 +73,7 @@ type ReconcileInstall struct {
 	// that reads objects from the cache and writes to the apiserver
 	client client.Client
 	scheme *runtime.Scheme
-	config *manifests.YamlFile
+	config *yaml.YamlFile
 }
 
 // Reconcile reads that state of the cluster for a Install object and makes changes based on the state read
