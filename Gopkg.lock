@@ -246,11 +246,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:92fd5e8f5c8d6d735af2bb67ad1a9954c415d1c8c3bf7adc1da9029220cdabf5"
+  digest = "1:a6bf1689470f489ac0d4109cdaaf421121decaf304ccdc4172afbc326fd65625"
   name = "github.com/jcrossley3/manifestival"
   packages = ["yaml"]
   pruneopts = "NT"
-  revision = "4281f924d909aafe500e55990f5ce2d10be60a07"
+  revision = "f5dbe9f91641e3a25027414af373b4171bd84f4f"
 
 [[projects]]
   digest = "1:f5b9328966ccea0970b1d15075698eff0ddb3e75889560aad2e9f76b289b536a"
